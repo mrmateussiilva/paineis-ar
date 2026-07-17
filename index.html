@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Vitrine 3D — Monte & Mostre</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/webxr/ARButton.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/exporters/GLTFExporter.js"></script>
 <style>
   :root{
     --bg:#0F0D12; --surface:#1A171E; --surface-2:#221E27;
@@ -108,24 +110,17 @@
   /* ---------- AR ---------- */
   #ar-view{position:relative; background:#000;}
   .ar-stage{flex:1; position:relative; overflow:hidden; background:#050506;}
-  #ar-video{position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:none;}
-  #ar-photo{position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:none;}
   #ar-canvas{position:absolute; inset:0; width:100%; height:100%; touch-action:none;}
   .ar-empty{position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
     flex-direction:column; gap:14px; text-align:center; padding:30px;}
   .ar-empty p{color:var(--muted); font-size:13px; max-width:280px; line-height:1.5;}
   .ar-empty-icon{font-size:38px;}
-  .ar-panel-bottom{position:absolute; left:0; right:0; bottom:0; padding:14px calc(16px + var(--sar)) calc(14px + var(--sab)) calc(16px + var(--sal));
-    background:linear-gradient(0deg, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 100%); display:flex;
-    flex-direction:column; gap:10px;}
-  .ar-sliders{display:flex; gap:14px;}
-  .ar-slider{flex:1; background:rgba(20,17,24,0.7); backdrop-filter:blur(6px); padding:8px 12px; border-radius:10px;}
-  .ar-slider .row-label{margin-bottom:2px; color:#c9c3ce;}
+  .ar-empty h3{font-size:18px;}
+  .ar-empty small{display:block; color:var(--muted); font-size:11px; max-width:300px; line-height:1.45;}
   .ar-buttons{display:flex; gap:8px;}
   .ar-buttons .btn{flex:1; font-size:12px; padding:12px;}
-  input[type=file]{display:none;}
-  #ar-canvas.dragging{cursor:grabbing;}
-  #ar-canvas{cursor:grab;}
+  .ar-buttons.is-hidden{display:none;}
+  .webxr-native-button{position:absolute!important; width:1px!important; height:1px!important; opacity:0!important; pointer-events:none!important;}
   .ar-placement-hint{position:absolute; top:calc(14px + var(--sat)); left:50%; transform:translateX(-50%);
     background:rgba(20,17,24,0.75); backdrop-filter:blur(6px); color:var(--text); font-size:12px;
     padding:8px 14px; border-radius:20px; pointer-events:none; transition:opacity .3s; z-index:3;
@@ -211,38 +206,20 @@
     <!-- AR -->
     <div id="ar-view" class="view">
       <div class="ar-stage" id="ar-stage">
-        <video id="ar-video" playsinline muted autoplay></video>
-        <img id="ar-photo" alt="foto do local">
         <canvas id="ar-canvas"></canvas>
         <div class="ar-placement-hint hidden" id="ar-placement-hint">
-          <span>👆</span><span>toque no chão pra posicionar · 2 dedos pra girar e ajustar tamanho</span>
+          <span>👆</span><span>aponte para o chão e toque para ancorar em tamanho real</span>
         </div>
         <div class="ar-empty" id="ar-empty">
-          <div class="ar-empty-icon">📷</div>
+          <div class="ar-empty-icon">▣</div>
           <h3 style="margin:0;">Mostrar no local</h3>
-          <p>Ative a câmera pra apontar pro salão, ou envie uma foto do local. A montagem do passo 1 aparece por cima — arraste pra posicionar.</p>
-          <div class="ar-buttons" style="width:220px;">
-            <button class="btn btn-primary" id="ar-start-camera">Ativar câmera</button>
+          <p>A montagem será aberta em Realidade Aumentada em escala 1:1. Aponte para o piso do salão e toque no retículo para posicionar.</p>
+          <div class="ar-buttons" id="ar-actions" style="width:min(360px,100%);">
+            <button class="btn btn-primary" id="ar-open-android">Abrir AR (Android)</button>
+            <button class="btn btn-ghost" id="ar-open-ios">Abrir AR (iPhone)</button>
           </div>
-          <button class="btn btn-ghost" id="ar-upload-btn" style="width:220px;">Usar foto do local</button>
-          <input type="file" id="ar-file-input" accept="image/*">
-        </div>
-      </div>
-      <div class="ar-panel-bottom" id="ar-controls" style="display:none;">
-        <div class="ar-sliders">
-          <div class="ar-slider">
-            <div class="row-label"><span>Tamanho</span><b id="ar-scale-val">100%</b></div>
-            <input type="range" id="ar-scale" min="40" max="220" value="100">
-          </div>
-          <div class="ar-slider">
-            <div class="row-label"><span>Girar</span><b id="ar-rot-val">0°</b></div>
-            <input type="range" id="ar-rot" min="-180" max="180" value="0">
-          </div>
-        </div>
-        <div class="ar-buttons">
-          <button class="btn btn-ghost" id="ar-reset">Recentralizar</button>
-          <button class="btn btn-ghost" id="ar-swap">Trocar fundo</button>
-          <button class="btn btn-primary" id="ar-capture">Capturar imagem</button>
+          <small id="ar-device-note"></small>
+          <a id="ios-ar-link" rel="ar" style="display:none;"><img alt=""></a>
         </div>
       </div>
     </div>
@@ -640,237 +617,238 @@ document.getElementById('tab-builder').addEventListener('click', ()=>switchTab('
 document.getElementById('tab-ar').addEventListener('click', ()=>switchTab('ar'));
 
 /* ============================================================
-   AR (OVERLAY) SCENE
+   AR NATIVO (WEBXR + QUICK LOOK)
    ============================================================ */
-let arScene, arCamera, arRenderer, arGroup, arReady=false, arStream=null;
-let arTransform = { scale:1.0, rot:0, offX:0, offZ:-2.2 };
-let arPointers = new Map();
-let pinchState = null;
-const arRaycaster = new THREE.Raycaster();
-const arGroundPlane = new THREE.Plane(new THREE.Vector3(0,1,0), 0);
-const clamp = (v,min,max)=> Math.min(max, Math.max(min, v));
+let arScene, arCamera, arRenderer, arGroup, arReticle, arController;
+let arHitTestSource = null;
+let arHitTestSourceRequested = false;
+let nativeARButton = null;
+let iosObjectUrl = null;
 
 function initARThree(){
   const canvas = document.getElementById('ar-canvas');
   arScene = new THREE.Scene();
-  // Câmera na altura aproximada de quem segura o celular, olhando levemente pra baixo —
-  // isso é o que faz o objeto "encolher" de forma realista ao arrastar pra longe.
-  arCamera = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
-  arCamera.position.set(0, 1.45, 3.4);
-  arCamera.lookAt(0, 0.75, -2.5);
+  arCamera = new THREE.PerspectiveCamera(70, 1, 0.01, 40);
 
   arRenderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:true});
   arRenderer.setClearColor(0x000000, 0);
+  arRenderer.xr.enabled = true;
+  arRenderer.setAnimationLoop(renderARFrame);
 
-  const hemi = new THREE.HemisphereLight(0xffffff, 0x333333, 0.95);
+  const hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 1.05);
   arScene.add(hemi);
-  const dir = new THREE.DirectionalLight(0xffffff, 0.75);
-  dir.position.set(2,4,3);
+  const dir = new THREE.DirectionalLight(0xffffff, 0.65);
+  dir.position.set(2,4,2);
   arScene.add(dir);
 
+  arReticle = new THREE.Mesh(
+    new THREE.RingGeometry(0.18, 0.24, 32).rotateX(-Math.PI / 2),
+    new THREE.MeshBasicMaterial({color:0xFF5A36})
+  );
+  arReticle.matrixAutoUpdate = false;
+  arReticle.visible = false;
+  arScene.add(arReticle);
+
   rebuildARGroup();
-  bindARPointerEvents(canvas);
+  arGroup.visible = false;
+
+  arController = arRenderer.xr.getController(0);
+  arController.addEventListener('select', placeARGroupAtReticle);
+  arScene.add(arController);
+
+  createNativeARButton();
+  resizeAR();
 }
 
 function rebuildARGroup(){
   if(!arScene) return;
+  const wasPlaced = arGroup ? arGroup.visible : false;
+  const oldPosition = arGroup ? arGroup.position.clone() : null;
+  const oldQuaternion = arGroup ? arGroup.quaternion.clone() : null;
   if(arGroup) arScene.remove(arGroup);
   arGroup = buildAssemblyGroup(config, {includeShadowBlob:true});
-  applyARTransform();
+  arGroup.scale.setScalar(1);
+  arGroup.visible = wasPlaced;
+  if(oldPosition && oldQuaternion){
+    arGroup.position.copy(oldPosition);
+    arGroup.quaternion.copy(oldQuaternion);
+  }
   arScene.add(arGroup);
 }
 
-function applyARTransform(){
-  if(!arGroup) return;
-  arGroup.scale.setScalar(arTransform.scale);
-  arGroup.rotation.y = arTransform.rot * Math.PI/180;
-  arGroup.position.set(arTransform.offX, 0, arTransform.offZ);
+function placeARGroupAtReticle(){
+  if(!arReticle || !arReticle.visible || !arGroup) return;
+  arReticle.matrix.decompose(arGroup.position, arGroup.quaternion, arGroup.scale);
+  arGroup.scale.setScalar(1);
+  arGroup.visible = true;
+  document.getElementById('ar-empty').style.display = 'none';
+  document.getElementById('ar-placement-hint').classList.add('hidden');
 }
 
-// Converte um ponto de toque na tela numa posição real no "chão" da cena,
-// via raycast — é isso que dá a sensação de profundidade/perspectiva real
-// (quanto mais longe a pessoa arrasta, menor o objeto fica, automaticamente).
-function screenToGround(clientX, clientY, canvas){
-  const rect = canvas.getBoundingClientRect();
-  const ndc = new THREE.Vector2(
-    ((clientX-rect.left)/rect.width)*2-1,
-    -((clientY-rect.top)/rect.height)*2+1
-  );
-  arRaycaster.setFromCamera(ndc, arCamera);
-  const pt = new THREE.Vector3();
-  const hit = arRaycaster.ray.intersectPlane(arGroundPlane, pt);
-  return hit ? pt : null;
-}
-
-function placeAtScreenPoint(clientX, clientY, canvas){
-  const p = screenToGround(clientX, clientY, canvas);
-  if(!p) return;
-  arTransform.offX = clamp(p.x, -4.5, 4.5);
-  arTransform.offZ = clamp(p.z, -8, -0.6);
-  applyARTransform();
-}
-
-function hidePlacementHint(){
-  const hint = document.getElementById('ar-placement-hint');
-  if(hint) hint.classList.add('hidden');
-}
-
-function bindARPointerEvents(canvas){
-  canvas.addEventListener('pointerdown', e=>{
-    canvas.setPointerCapture(e.pointerId);
-    arPointers.set(e.pointerId, {x:e.clientX, y:e.clientY});
-    hidePlacementHint();
-    if(arPointers.size >= 2){
-      const pts = [...arPointers.values()].slice(0,2);
-      const dist0 = Math.hypot(pts[0].x-pts[1].x, pts[0].y-pts[1].y);
-      const angle0 = Math.atan2(pts[1].y-pts[0].y, pts[1].x-pts[0].x);
-      pinchState = {dist0, angle0, scale0:arTransform.scale, rot0:arTransform.rot};
-      canvas.classList.remove('dragging');
-    } else {
-      canvas.classList.add('dragging');
-      placeAtScreenPoint(e.clientX, e.clientY, canvas);
-    }
+function createNativeARButton(){
+  if(nativeARButton || !THREE.ARButton) return;
+  nativeARButton = THREE.ARButton.createButton(arRenderer, {
+    requiredFeatures:['hit-test'],
+    optionalFeatures:['local-floor', 'dom-overlay'],
+    domOverlay:{root:document.body}
   });
+  nativeARButton.className = 'webxr-native-button';
+  nativeARButton.setAttribute('aria-hidden', 'true');
+  document.body.appendChild(nativeARButton);
 
-  canvas.addEventListener('pointermove', e=>{
-    if(!arPointers.has(e.pointerId)) return;
-    arPointers.set(e.pointerId, {x:e.clientX, y:e.clientY});
-
-    if(arPointers.size >= 2 && pinchState){
-      const pts = [...arPointers.values()].slice(0,2);
-      const dist = Math.hypot(pts[0].x-pts[1].x, pts[0].y-pts[1].y);
-      const angle = Math.atan2(pts[1].y-pts[0].y, pts[1].x-pts[0].x);
-      arTransform.scale = clamp(pinchState.scale0 * (dist/pinchState.dist0), 0.4, 2.4);
-      arTransform.rot = pinchState.rot0 + (angle-pinchState.angle0)*180/Math.PI;
-      syncARSliders();
-      applyARTransform();
-    } else if(arPointers.size===1){
-      placeAtScreenPoint(e.clientX, e.clientY, canvas);
-    }
+  arRenderer.xr.addEventListener('sessionstart', ()=>{
+    arHitTestSource = null;
+    arHitTestSourceRequested = false;
+    arReticle.visible = false;
+    if(arGroup) arGroup.visible = false;
+    document.getElementById('ar-empty').style.display = 'none';
+    document.getElementById('ar-placement-hint').classList.remove('hidden');
   });
+  arRenderer.xr.addEventListener('sessionend', ()=>{
+    arHitTestSource = null;
+    arHitTestSourceRequested = false;
+    arReticle.visible = false;
+    document.getElementById('ar-empty').style.display = 'flex';
+    document.getElementById('ar-placement-hint').classList.add('hidden');
+  });
+}
 
-  function endPointer(e){
-    arPointers.delete(e.pointerId);
-    pinchState = null;
-    if(arPointers.size===0) canvas.classList.remove('dragging');
+function renderARFrame(timestamp, frame){
+  if(frame){
+    const referenceSpace = arRenderer.xr.getReferenceSpace();
+    const session = arRenderer.xr.getSession();
+
+    if(!arHitTestSourceRequested){
+      session.requestReferenceSpace('viewer').then(referenceSpaceViewer=>{
+        return session.requestHitTestSource({space:referenceSpaceViewer});
+      }).then(source=>{
+        arHitTestSource = source;
+      }).catch(()=>{
+        arHitTestSourceRequested = false;
+        arHitTestSource = null;
+      });
+
+      session.addEventListener('end', ()=>{
+        arHitTestSourceRequested = false;
+        arHitTestSource = null;
+      });
+
+      arHitTestSourceRequested = true;
+    }
+
+    if(arHitTestSource){
+      const hitTestResults = frame.getHitTestResults(arHitTestSource);
+      if(hitTestResults.length){
+        const hit = hitTestResults[0];
+        const pose = hit.getPose(referenceSpace);
+        arReticle.visible = true;
+        arReticle.matrix.fromArray(pose.transform.matrix);
+      } else {
+        arReticle.visible = false;
+      }
+    }
   }
-  canvas.addEventListener('pointerup', endPointer);
-  canvas.addEventListener('pointercancel', endPointer);
-}
 
-function syncARSliders(){
-  const scaleEl = document.getElementById('ar-scale');
-  const rotEl = document.getElementById('ar-rot');
-  const scalePct = Math.round(arTransform.scale*100);
-  const rotDeg = Math.round(((arTransform.rot+180)%360+360)%360 - 180);
-  scaleEl.value = clamp(scalePct, 40, 220);
-  rotEl.value = clamp(rotDeg, -180, 180);
-  document.getElementById('ar-scale-val').textContent = scaleEl.value + '%';
-  document.getElementById('ar-rot-val').textContent = rotEl.value + '°';
+  arRenderer.render(arScene, arCamera);
 }
 
 function resizeAR(){
   const stage = document.getElementById('ar-stage');
   const w = stage.clientWidth, h = stage.clientHeight;
-  if(!arRenderer) return;
+  if(!arRenderer || !w || !h) return;
   arRenderer.setSize(w,h);
   arRenderer.setPixelRatio(Math.min(2, window.devicePixelRatio));
   arCamera.aspect = w/h;
   arCamera.updateProjectionMatrix();
 }
 
-let arAnimHandle = null;
-function animateAR(){
-  arAnimHandle = requestAnimationFrame(animateAR);
-  if(arRenderer) arRenderer.render(arScene, arCamera);
-}
-
 function onEnterAR(){
   if(!arScene) initARThree();
   rebuildARGroup();
   resizeAR();
-  if(!arAnimHandle) animateAR();
-}
-function onLeaveAR(){
-  if(arAnimHandle){ cancelAnimationFrame(arAnimHandle); arAnimHandle=null; }
+  updateARDeviceUI();
 }
 
-/* ---- câmera / foto de fundo ---- */
-async function startCamera(){
-  const video = document.getElementById('ar-video');
-  try{
-    arStream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}, audio:false});
-    video.srcObject = arStream;
-    video.style.display = 'block';
-    document.getElementById('ar-photo').style.display = 'none';
-    onARBackgroundReady();
-  }catch(err){
-    alert('Não consegui acessar a câmera aqui (comum dentro do preview do chat). Use "usar foto do local" — funciona igual pra mostrar a montagem.');
+function onLeaveAR(){
+  if(arRenderer && arRenderer.xr && arRenderer.xr.getSession()){
+    arRenderer.xr.getSession().end();
+  }
+  document.getElementById('ar-placement-hint').classList.add('hidden');
+}
+
+function updateARDeviceUI(){
+  const ua = navigator.userAgent || '';
+  const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const isAndroid = /Android/.test(ua);
+  const androidBtn = document.getElementById('ar-open-android');
+  const iosBtn = document.getElementById('ar-open-ios');
+  const note = document.getElementById('ar-device-note');
+
+  androidBtn.style.display = isIOS ? 'none' : 'block';
+  iosBtn.style.display = isAndroid ? 'none' : 'block';
+  note.textContent = isIOS
+    ? 'No iPhone, o arquivo GLB é gerado com as texturas atuais e aberto via Quick Look.'
+    : 'No Android, o Chrome usa WebXR com hit-test para detectar o chão real.';
+}
+
+function openAndroidAR(){
+  if(!arScene) initARThree();
+  resizeAR();
+  if(nativeARButton && typeof nativeARButton.click === 'function'){
+    nativeARButton.click();
+  } else {
+    alert('WebXR AR não está disponível neste navegador. Use Chrome em um Android compatível.');
   }
 }
 
-function useUploadedPhoto(file){
-  const img = document.getElementById('ar-photo');
-  const url = URL.createObjectURL(file);
-  img.src = url;
-  img.style.display = 'block';
-  document.getElementById('ar-video').style.display = 'none';
-  if(arStream){ arStream.getTracks().forEach(t=>t.stop()); arStream = null; }
-  onARBackgroundReady();
+function exportCurrentAssemblyGLB(){
+  return new Promise((resolve, reject)=>{
+    if(!THREE.GLTFExporter){
+      reject(new Error('GLTFExporter não carregou.'));
+      return;
+    }
+    const exportScene = new THREE.Scene();
+    const exportGroup = buildAssemblyGroup(config, {includeShadowBlob:false});
+    exportGroup.name = 'Vitrine 3D - escala real';
+    exportScene.add(exportGroup);
+
+    const exporter = new THREE.GLTFExporter();
+    exporter.parse(
+      exportScene,
+      result=>{
+        const blob = result instanceof ArrayBuffer
+          ? new Blob([result], {type:'model/gltf-binary'})
+          : new Blob([JSON.stringify(result)], {type:'model/gltf+json'});
+        resolve(blob);
+      },
+      {binary:true}
+    );
+  });
 }
 
-function onARBackgroundReady(){
-  document.getElementById('ar-empty').style.display = 'none';
-  document.getElementById('ar-controls').style.display = 'flex';
-  document.getElementById('ar-placement-hint').classList.remove('hidden');
-  resizeAR();
+async function openIOSQuickLook(){
+  const iosBtn = document.getElementById('ar-open-ios');
+  iosBtn.disabled = true;
+  iosBtn.textContent = 'Gerando GLB...';
+  try{
+    const blob = await exportCurrentAssemblyGLB();
+    if(iosObjectUrl) URL.revokeObjectURL(iosObjectUrl);
+    iosObjectUrl = URL.createObjectURL(blob);
+
+    const link = document.getElementById('ios-ar-link');
+    link.href = iosObjectUrl;
+    link.download = 'vitrine-3d.glb';
+    link.click();
+  }catch(err){
+    alert('Não consegui gerar o arquivo AR: ' + err.message);
+  }finally{
+    iosBtn.disabled = false;
+    iosBtn.textContent = 'Abrir AR (iPhone)';
+  }
 }
 
-document.getElementById('ar-start-camera').addEventListener('click', startCamera);
-document.getElementById('ar-upload-btn').addEventListener('click', ()=> document.getElementById('ar-file-input').click());
-document.getElementById('ar-file-input').addEventListener('change', e=>{
-  if(e.target.files[0]) useUploadedPhoto(e.target.files[0]);
-});
-document.getElementById('ar-swap').addEventListener('click', ()=>{
-  document.getElementById('ar-empty').style.display = 'flex';
-  document.getElementById('ar-controls').style.display = 'none';
-  document.getElementById('ar-video').style.display = 'none';
-  document.getElementById('ar-photo').style.display = 'none';
-  if(arStream){ arStream.getTracks().forEach(t=>t.stop()); arStream = null; }
-});
-document.getElementById('ar-scale').addEventListener('input', e=>{
-  arTransform.scale = e.target.value/100;
-  document.getElementById('ar-scale-val').textContent = e.target.value + '%';
-  applyARTransform();
-});
-document.getElementById('ar-rot').addEventListener('input', e=>{
-  arTransform.rot = parseFloat(e.target.value);
-  document.getElementById('ar-rot-val').textContent = e.target.value + '°';
-  applyARTransform();
-});
-document.getElementById('ar-reset').addEventListener('click', ()=>{
-  arTransform = {scale:1, rot:0, offX:0, offZ:-2.2};
-  document.getElementById('ar-scale').value = 100;
-  document.getElementById('ar-rot').value = 0;
-  document.getElementById('ar-scale-val').textContent = '100%';
-  document.getElementById('ar-rot-val').textContent = '0°';
-  applyARTransform();
-  document.getElementById('ar-placement-hint').classList.remove('hidden');
-});
-document.getElementById('ar-capture').addEventListener('click', ()=>{
-  const stage = document.getElementById('ar-stage');
-  const w = stage.clientWidth, h = stage.clientHeight;
-  const out = document.createElement('canvas');
-  out.width = w; out.height = h;
-  const ctx = out.getContext('2d');
-  const bg = document.getElementById('ar-video').style.display==='block' ? document.getElementById('ar-video') : document.getElementById('ar-photo');
-  try{ ctx.drawImage(bg, 0, 0, w, h); }catch(e){}
-  ctx.drawImage(document.getElementById('ar-canvas'), 0, 0, w, h);
-  const link = document.createElement('a');
-  link.download = 'vitrine-3d-preview.png';
-  link.href = out.toDataURL('image/png');
-  link.click();
-});
+document.getElementById('ar-open-android').addEventListener('click', openAndroidAR);
+document.getElementById('ar-open-ios').addEventListener('click', openIOSQuickLook);
 
 /* ============================================================
    INIT
