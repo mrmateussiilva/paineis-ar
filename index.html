@@ -1,861 +1,112 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="pt-BR">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>Vitrine 3D — Monte & Mostre</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/webxr/ARButton.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/exporters/GLTFExporter.js"></script>
-<style>
-  :root{
-    --bg:#0F0D12; --surface:#1A171E; --surface-2:#221E27;
-    --accent:#FF5A36; --accent-2:#FFC145; --accent-3:#7C5CFC;
-    --text:#F5F1EA; --muted:#8F8792; --line:#2C2732;
-    --sat:env(safe-area-inset-top,0px); --sab:env(safe-area-inset-bottom,0px);
-    --sal:env(safe-area-inset-left,0px); --sar:env(safe-area-inset-right,0px);
-  }
-  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent; touch-action:manipulation;}
-  html,body{margin:0; height:100vh; height:100dvh; background:var(--bg); color:var(--text);
-    font-family:'Manrope','Inter',system-ui,sans-serif; overflow:hidden; overscroll-behavior:none;}
-  h1,h2,h3,.display{font-family:'Archivo Black','Arial Black',sans-serif; letter-spacing:-0.01em;}
-  #app{display:flex; flex-direction:column; height:100vh; height:100dvh;}
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#0b0d12">
+    <title>Vitrine 3D - Monte & Mostre</title>
+    <link rel="stylesheet" href="./style.css">
+  </head>
+  <body>
+    <div id="app">
+      <header class="app-header">
+        <div class="brand">
+          <span class="display">VITRINE&nbsp;3D</span>
+          <span class="tag">// monte a festa, mostre no local</span>
+        </div>
+        <nav class="tabs" aria-label="Etapas">
+          <button id="tab-builder" class="active" type="button">1 · Montar</button>
+          <button id="tab-ar" type="button">2 · Ver no local (AR)</button>
+        </nav>
+      </header>
 
-  header{display:flex; align-items:center; justify-content:space-between;
-    padding:calc(10px + var(--sat)) calc(14px + var(--sar)) 10px calc(14px + var(--sal));
-    border-bottom:1px solid var(--line); flex-shrink:0; gap:10px;}
-  .brand{display:flex; flex-direction:column; gap:1px; min-width:0;}
-  .brand .display{font-size:15px; white-space:nowrap;}
-  .brand .tag{font-size:10px; color:var(--muted); font-family:'JetBrains Mono',monospace; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
-  nav.tabs{display:flex; gap:4px; background:var(--surface); padding:4px; border-radius:10px; flex-shrink:0;}
-  nav.tabs button{background:transparent; border:none; color:var(--muted); font-weight:700;
-    font-size:12px; padding:9px 12px; border-radius:7px; cursor:pointer; font-family:inherit; white-space:nowrap;}
-  nav.tabs button.active{background:var(--accent); color:#160C08;}
+      <main>
+        <section id="builder-view" class="view active" aria-label="Montagem 3D">
+          <div class="stage">
+            <canvas id="builder-canvas"></canvas>
+            <div class="stage-hint">arraste para girar · scroll para zoom</div>
+          </div>
 
-  main{flex:1; display:flex; min-height:0;}
-  .view{display:none; width:100%; height:100%;}
-  .view.active{display:flex;}
+          <aside class="controls" id="controls-drawer" aria-label="Controles da montagem">
+            <div class="drawer-handle" id="drawer-handle">
+              <div class="drawer-handle-content">
+                <div class="grip"></div>
+                <div class="drawer-handle-row">
+                  <span>PERSONALIZAR</span>
+                  <b id="drawer-summary">Geométrico Dourado · 3,0 m</b>
+                </div>
+              </div>
+            </div>
 
-  @media (max-width:780px){
-    .brand .tag{display:none;}
-    nav.tabs button{padding:9px 10px; font-size:11px;}
-  }
+            <section class="ctl-block">
+              <h3>Temas prontos</h3>
+              <div class="theme-grid" id="theme-grid"></div>
+            </section>
 
-  /* ---------- Builder ---------- */
-  #builder-view{position:relative; overflow:hidden;}
-  #builder-view .stage{flex:1; position:relative; background:radial-gradient(ellipse at 50% 30%, #1c1822 0%, #0b0a0d 70%);}
-  #builder-canvas{width:100%; height:100%; display:block; cursor:grab;}
-  #builder-canvas:active{cursor:grabbing;}
-  .stage-hint{position:absolute; bottom:14px; left:14px; font-size:11px; color:var(--muted);
-    font-family:'JetBrains Mono',monospace; background:rgba(0,0,0,0.35); padding:6px 10px; border-radius:6px;}
+            <section class="ctl-block">
+              <h3>Painel de fundo</h3>
+              <div class="row-label"><span>Largura</span><b id="width-val">3.0 m</b></div>
+              <input type="range" id="width-slider" min="2" max="6" step="0.2" value="3">
+            </section>
 
-  aside.controls{width:308px; flex-shrink:0; background:var(--surface); border-left:1px solid var(--line);
-    overflow-y:auto; padding:18px; display:flex; flex-direction:column; gap:20px;}
-  .drawer-handle{display:none;}
-  .ctl-block h3{font-size:11px; text-transform:uppercase; letter-spacing:0.08em; color:var(--muted);
-    margin:0 0 10px 0; font-family:'JetBrains Mono',monospace; font-weight:500;}
-  .theme-grid{display:grid; grid-template-columns:1fr 1fr; gap:8px;}
-  .theme-card{border:1.5px solid var(--line); border-radius:10px; padding:8px; cursor:pointer; background:var(--surface-2);}
-  .theme-card.active{border-color:var(--accent); box-shadow:0 0 0 1px var(--accent);}
-  .theme-swatch{height:40px; border-radius:6px; margin-bottom:6px;}
-  .theme-card span{font-size:11px; font-weight:700; display:block;}
+            <section class="ctl-block">
+              <h3>Cores do arco de balão</h3>
+              <div class="color-row">
+                <label for="balloon-color-1">Cor 1</label>
+                <input type="color" id="balloon-color-1">
+              </div>
+              <div class="color-row">
+                <label for="balloon-color-2">Cor 2</label>
+                <input type="color" id="balloon-color-2">
+              </div>
+            </section>
 
-  /* ---- mobile: stage full-screen behind a draggable bottom sheet ---- */
-  @media (max-width:780px){
-    #builder-view{flex-direction:column;}
-    #builder-view .stage{position:absolute; inset:0; flex:none;}
-    aside.controls{
-      position:absolute; left:0; right:0; bottom:0; width:auto; max-height:78vh;
-      border-left:none; border-top:1px solid var(--line); border-radius:18px 18px 0 0;
-      box-shadow:0 -8px 30px rgba(0,0,0,0.45); padding:8px 16px calc(16px + var(--sab));
-      transform:translateY(calc(100% - 118px)); transition:transform .28s cubic-bezier(.2,.8,.3,1);
-      gap:16px; z-index:5;
-    }
-    aside.controls.open{transform:translateY(0);}
-    .drawer-handle{display:flex; align-items:center; justify-content:space-between; flex-shrink:0;
-      padding:10px 2px 6px; cursor:pointer;}
-    .drawer-handle .grip{width:36px; height:4px; background:var(--line); border-radius:4px; margin:0 auto;}
-    .drawer-handle-row{display:flex; align-items:center; justify-content:space-between;}
-    .drawer-handle-row span{font-size:12px; font-weight:800; color:var(--muted); font-family:'JetBrains Mono',monospace;}
-    .drawer-handle-row b{color:var(--text); font-size:13px;}
-    .theme-grid{grid-template-columns:none; grid-auto-flow:column; grid-auto-columns:104px; overflow-x:auto; padding-bottom:4px;}
-    .cta{margin-top:6px;}
-  }
+            <section class="ctl-block">
+              <h3>Itens do cenário</h3>
+              <div class="toggle-row">
+                <span>Totens laterais</span>
+                <label class="switch"><input type="checkbox" id="toggle-totems" checked><span class="slider-pill"></span></label>
+              </div>
+              <div class="toggle-row">
+                <span>Arco de balões</span>
+                <label class="switch"><input type="checkbox" id="toggle-arch" checked><span class="slider-pill"></span></label>
+              </div>
+              <div class="toggle-row">
+                <span>Mesa de apoio</span>
+                <label class="switch"><input type="checkbox" id="toggle-table"><span class="slider-pill"></span></label>
+              </div>
+            </section>
 
-  .row-label{display:flex; justify-content:space-between; font-size:12px; color:var(--muted); margin-bottom:6px;}
-  .row-label b{color:var(--text); font-family:'JetBrains Mono',monospace; font-weight:500;}
-  input[type=range]{width:100%; accent-color:var(--accent);}
+            <div class="cta">
+              <div class="row-label"><span>Área do painel (aprox.)</span><b id="area-val">7,2 m²</b></div>
+              <button class="btn btn-primary" id="go-to-ar" type="button">Ver no local (AR)</button>
+              <button class="btn btn-ghost" id="send-quote" type="button">Enviar montagem pro orçamento</button>
+            </div>
+          </aside>
+        </section>
 
-  .toggle-row{display:flex; align-items:center; justify-content:space-between; padding:9px 0;
-    border-bottom:1px solid var(--line); font-size:13px;}
-  .toggle-row:last-child{border-bottom:none;}
-  .switch{position:relative; width:38px; height:22px; flex-shrink:0;}
-  .switch input{opacity:0; width:0; height:0;}
-  .slider-pill{position:absolute; inset:0; background:#3a3542; border-radius:20px; cursor:pointer; transition:.15s;}
-  .slider-pill:before{content:""; position:absolute; width:16px; height:16px; left:3px; top:3px;
-    background:var(--text); border-radius:50%; transition:.15s;}
-  .switch input:checked + .slider-pill{background:var(--accent);}
-  .switch input:checked + .slider-pill:before{transform:translateX(16px);}
-
-  .color-row{display:flex; gap:10px; align-items:center;}
-  .color-row label{font-size:12px; color:var(--muted); flex:1;}
-  input[type=color]{width:32px; height:32px; border:none; border-radius:8px; background:none; padding:0; cursor:pointer;}
-
-  .cta{margin-top:auto; display:flex; flex-direction:column; gap:8px;}
-  .btn{border:none; border-radius:9px; padding:12px 14px; font-weight:800; font-size:13px;
-    cursor:pointer; font-family:inherit; text-align:center;}
-  .btn-primary{background:var(--accent); color:#160C08;}
-  .btn-ghost{background:transparent; color:var(--text); border:1px solid var(--line);}
-
-  /* ---------- AR ---------- */
-  #ar-view{position:relative; background:#000;}
-  .ar-stage{flex:1; position:relative; overflow:hidden; background:#050506;}
-  #ar-canvas{position:absolute; inset:0; width:100%; height:100%; touch-action:none;}
-  .ar-empty{position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
-    flex-direction:column; gap:14px; text-align:center; padding:30px;}
-  .ar-empty p{color:var(--muted); font-size:13px; max-width:280px; line-height:1.5;}
-  .ar-empty-icon{font-size:38px;}
-  .ar-empty h3{font-size:18px;}
-  .ar-empty small{display:block; color:var(--muted); font-size:11px; max-width:300px; line-height:1.45;}
-  .ar-buttons{display:flex; gap:8px;}
-  .ar-buttons .btn{flex:1; font-size:12px; padding:12px;}
-  .ar-buttons.is-hidden{display:none;}
-  .webxr-native-button{position:absolute!important; width:1px!important; height:1px!important; opacity:0!important; pointer-events:none!important;}
-  .ar-placement-hint{position:absolute; top:calc(14px + var(--sat)); left:50%; transform:translateX(-50%);
-    background:rgba(20,17,24,0.75); backdrop-filter:blur(6px); color:var(--text); font-size:12px;
-    padding:8px 14px; border-radius:20px; pointer-events:none; transition:opacity .3s; z-index:3;
-    display:flex; align-items:center; gap:6px;}
-  .ar-placement-hint.hidden{opacity:0;}
-</style>
-</head>
-<body>
-<div id="app">
-  <header>
-    <div class="brand">
-      <span class="display">VITRINE&nbsp;3D</span>
-      <span class="tag">// monte a festa, mostre no local</span>
-    </div>
-    <nav class="tabs">
-      <button id="tab-builder" class="active">1 · Montar</button>
-      <button id="tab-ar">2 · Ver no local (AR)</button>
-    </nav>
-  </header>
-
-  <main>
-    <!-- BUILDER -->
-    <div id="builder-view" class="view active">
-      <div class="stage">
-        <canvas id="builder-canvas"></canvas>
-        <div class="stage-hint">arraste para girar · scroll para zoom</div>
-      </div>
-      <aside class="controls" id="controls-drawer">
-        <div class="drawer-handle" id="drawer-handle">
-          <div style="flex:1;">
-            <div class="grip"></div>
-            <div class="drawer-handle-row" style="margin-top:8px;">
-              <span>PERSONALIZAR</span>
-              <b id="drawer-summary">Geométrico Dourado · 3,0 m</b>
+        <section id="ar-view" class="view" aria-label="Realidade aumentada">
+          <div class="ar-stage" id="ar-stage">
+            <canvas id="ar-canvas"></canvas>
+            <div class="ar-placement-hint hidden" id="ar-placement-hint">
+              <span>Toque no retículo para ancorar em tamanho real</span>
+            </div>
+            <div class="ar-empty" id="ar-empty">
+              <div class="ar-empty-icon">AR</div>
+              <h3>Mostrar no local</h3>
+              <p>A montagem abre em Realidade Aumentada com escala 1:1. Aponte para o piso e posicione o painel no retículo.</p>
+              <div class="ar-buttons" id="ar-actions">
+                <button class="btn btn-primary" id="ar-open-android" type="button">Abrir AR (Android)</button>
+                <button class="btn btn-ghost" id="ar-open-ios" type="button">Ver no iPhone (AR)</button>
+              </div>
+              <small id="ar-device-note"></small>
+              <a id="ios-ar-link" rel="ar" hidden><img alt=""></a>
             </div>
           </div>
-        </div>
-        <div class="ctl-block">
-          <h3>Temas prontos</h3>
-          <div class="theme-grid" id="theme-grid"></div>
-        </div>
-
-        <div class="ctl-block">
-          <h3>Painel de fundo</h3>
-          <div class="row-label"><span>Largura</span><b id="width-val">3.0 m</b></div>
-          <input type="range" id="width-slider" min="2" max="6" step="0.2" value="3">
-        </div>
-
-        <div class="ctl-block">
-          <h3>Cores do arco de balão</h3>
-          <div class="color-row" style="margin-bottom:8px;">
-            <label>Cor 1</label><input type="color" id="balloon-color-1">
-          </div>
-          <div class="color-row">
-            <label>Cor 2</label><input type="color" id="balloon-color-2">
-          </div>
-        </div>
-
-        <div class="ctl-block">
-          <h3>Itens do cenário</h3>
-          <div class="toggle-row">
-            <span>Totens laterais</span>
-            <label class="switch"><input type="checkbox" id="toggle-totems" checked><span class="slider-pill"></span></label>
-          </div>
-          <div class="toggle-row">
-            <span>Arco de balões</span>
-            <label class="switch"><input type="checkbox" id="toggle-arch" checked><span class="slider-pill"></span></label>
-          </div>
-          <div class="toggle-row">
-            <span>Mesa de apoio</span>
-            <label class="switch"><input type="checkbox" id="toggle-table"><span class="slider-pill"></span></label>
-          </div>
-        </div>
-
-        <div class="cta">
-          <div class="row-label"><span>Área do painel (aprox.)</span><b id="area-val">7,2 m²</b></div>
-          <button class="btn btn-primary" id="go-to-ar">Ver no local (AR) →</button>
-          <button class="btn btn-ghost" id="send-quote">Enviar montagem pro orçamento</button>
-        </div>
-      </aside>
+        </section>
+      </main>
     </div>
 
-    <!-- AR -->
-    <div id="ar-view" class="view">
-      <div class="ar-stage" id="ar-stage">
-        <canvas id="ar-canvas"></canvas>
-        <div class="ar-placement-hint hidden" id="ar-placement-hint">
-          <span>👆</span><span>aponte para o chão e toque para ancorar em tamanho real</span>
-        </div>
-        <div class="ar-empty" id="ar-empty">
-          <div class="ar-empty-icon">▣</div>
-          <h3 style="margin:0;">Mostrar no local</h3>
-          <p>A montagem será aberta em Realidade Aumentada em escala 1:1. Aponte para o piso do salão e toque no retículo para posicionar.</p>
-          <div class="ar-buttons" id="ar-actions" style="width:min(360px,100%);">
-            <button class="btn btn-primary" id="ar-open-android">Abrir AR (Android)</button>
-            <button class="btn btn-ghost" id="ar-open-ios">Abrir AR (iPhone)</button>
-          </div>
-          <small id="ar-device-note"></small>
-          <a id="ios-ar-link" rel="ar" style="display:none;"><img alt=""></a>
-        </div>
-      </div>
-    </div>
-  </main>
-</div>
-
-<script>
-/* ============================================================
-   CONFIG & THEMES
-   ============================================================ */
-const THEMES = [
-  { id:'geometrico', label:'Geométrico Dourado', panelBase:'#141018', panelBase2:'#221a2c', accent:'#D4AF37', totem:'#181119', balloons:['#D4AF37','#181119','#F5F1EA'] },
-  { id:'tropical',   label:'Tropical Neon',       panelBase:'#1B1033', panelBase2:'#0e0a2e', accent:'#33D6C0', totem:'#241947', balloons:['#33D6C0','#FF3D7A','#241947'] },
-  { id:'floral',     label:'Floral Rosé',         panelBase:'#F7E9E6', panelBase2:'#efd8d3', accent:'#C98E8E', totem:'#C98E8E', balloons:['#E8A0A0','#F7E9E6','#B5714B'] },
-  { id:'marmore',    label:'Mármore & Ouro',      panelBase:'#EDEAE3', panelBase2:'#dcd6c8', accent:'#C9A24B', totem:'#2B2B2B', balloons:['#C9A24B','#EDEAE3','#2B2B2B'] },
-];
-
-const config = {
-  theme: THEMES[0],
-  panelWidthM: 3.0,
-  showTotems: true,
-  showArch: true,
-  showTable: false,
-  balloonColor1: THEMES[0].balloons[0],
-  balloonColor2: THEMES[0].balloons[1],
-};
-
-/* ============================================================
-   PROCEDURAL TEXTURES (canvas -> THREE.CanvasTexture)
-   ============================================================ */
-function createPanelCanvas(theme){
-  const c = document.createElement('canvas'); c.width = 1024; c.height = 768;
-  const ctx = c.getContext('2d');
-  const grad = ctx.createLinearGradient(0,0,1024,768);
-  grad.addColorStop(0, theme.panelBase); grad.addColorStop(1, theme.panelBase2);
-  ctx.fillStyle = grad; ctx.fillRect(0,0,1024,768);
-
-  if(theme.id === 'geometrico'){
-    ctx.strokeStyle = theme.accent; ctx.globalAlpha = 0.55; ctx.lineWidth = 2;
-    const step = 96;
-    for(let y=-step; y<768+step; y+=step){
-      ctx.beginPath();
-      for(let x=0; x<=1024; x+=step){
-        const yy = y + (Math.floor(x/step)%2===0 ? 0 : step/2);
-        ctx.lineTo(x, yy);
-      }
-      ctx.stroke();
-    }
-    ctx.globalAlpha = 1;
-  } else if(theme.id === 'tropical'){
-    ctx.globalAlpha = 0.5;
-    for(let i=0;i<14;i++){
-      const x = Math.random()*1024, y = Math.random()*768, s = 60+Math.random()*90;
-      ctx.fillStyle = i%2===0 ? theme.accent : '#FF3D7A';
-      ctx.beginPath();
-      ctx.ellipse(x,y,s*0.25,s,Math.random()*Math.PI,0,Math.PI*2);
-      ctx.fill();
-    }
-    ctx.globalAlpha = 1;
-  } else if(theme.id === 'floral'){
-    ctx.globalAlpha = 0.5;
-    for(let i=0;i<26;i++){
-      const x = Math.random()*1024, y = Math.random()*768, r = 10+Math.random()*22;
-      ctx.fillStyle = theme.accent;
-      ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill();
-    }
-    ctx.globalAlpha = 1;
-  } else if(theme.id === 'marmore'){
-    ctx.globalAlpha = 0.4; ctx.strokeStyle = theme.accent; ctx.lineWidth = 1.5;
-    for(let i=0;i<10;i++){
-      ctx.beginPath();
-      const x0 = Math.random()*1024, y0 = 0;
-      ctx.moveTo(x0,y0);
-      ctx.bezierCurveTo(x0+Math.random()*300-150, 256, x0+Math.random()*300-150, 512, x0+Math.random()*200-100, 768);
-      ctx.stroke();
-    }
-    ctx.globalAlpha = 1;
-  }
-  // borda sutil
-  ctx.strokeStyle = theme.accent; ctx.globalAlpha = 0.8; ctx.lineWidth = 10;
-  ctx.strokeRect(5,5,1014,758);
-  return c;
-}
-
-function createShadowBlobTexture(){
-  const c = document.createElement('canvas'); c.width = 512; c.height = 256;
-  const ctx = c.getContext('2d');
-  const g = ctx.createRadialGradient(256,128,10,256,128,240);
-  g.addColorStop(0,'rgba(0,0,0,0.55)'); g.addColorStop(1,'rgba(0,0,0,0)');
-  ctx.fillStyle = g; ctx.fillRect(0,0,512,256);
-  return c;
-}
-
-function createFloorTexture(){
-  const c = document.createElement('canvas'); c.width = 512; c.height = 512;
-  const ctx = c.getContext('2d');
-  ctx.fillStyle = '#141019'; ctx.fillRect(0,0,512,512);
-  const g = ctx.createRadialGradient(256,256,20,256,256,300);
-  g.addColorStop(0,'rgba(255,255,255,0.06)'); g.addColorStop(1,'rgba(0,0,0,0)');
-  ctx.fillStyle = g; ctx.fillRect(0,0,512,512);
-  return c;
-}
-
-/* ============================================================
-   ASSEMBLY BUILDER (shared between builder & AR)
-   ============================================================ */
-function buildAssemblyGroup(cfg, opts){
-  opts = opts || {};
-  const group = new THREE.Group();
-  const theme = cfg.theme;
-  const w = cfg.panelWidthM;
-  const h = 2.4;
-
-  // estrutura (postes de alumínio atrás do painel)
-  const poleMat = new THREE.MeshStandardMaterial({color:0x2a2a2e, metalness:0.6, roughness:0.4});
-  [-w/2+0.05, w/2-0.05].forEach(px=>{
-    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.035,0.035,h+0.3,10), poleMat);
-    pole.position.set(px, (h+0.3)/2, -1.55);
-    group.add(pole);
-  });
-
-  // painel
-  const panelCanvas = createPanelCanvas(theme);
-  const panelTex = new THREE.CanvasTexture(panelCanvas);
-  panelTex.anisotropy = 4;
-  const panel = new THREE.Mesh(
-    new THREE.BoxGeometry(w, h, 0.04),
-    new THREE.MeshStandardMaterial({map:panelTex, roughness:0.55, metalness:0.05})
-  );
-  panel.position.set(0, h/2, -1.5);
-  panel.castShadow = true;
-  group.add(panel);
-
-  // totens
-  if(cfg.showTotems){
-    const totemMat = new THREE.MeshStandardMaterial({color:new THREE.Color(theme.totem), roughness:0.4, metalness:0.25});
-    const ringMat = new THREE.MeshStandardMaterial({color:new THREE.Color(theme.accent), metalness:0.8, roughness:0.3});
-    [-1,1].forEach(side=>{
-      const tx = side * (w/2 + 0.55);
-      const totem = new THREE.Mesh(new THREE.CylinderGeometry(0.22,0.24,1.9,20), totemMat);
-      totem.position.set(tx, 0.95, -0.4);
-      totem.castShadow = true;
-      group.add(totem);
-      [0.05, 1.85].forEach(ry=>{
-        const ring = new THREE.Mesh(new THREE.TorusGeometry(0.235,0.02,8,24), ringMat);
-        ring.rotation.x = Math.PI/2;
-        ring.position.set(tx, ry, -0.4);
-        group.add(ring);
-      });
-    });
-  }
-
-  // arco de balões
-  if(cfg.showArch){
-    const colors = [cfg.balloonColor1, cfg.balloonColor2, theme.accent];
-    const archGroup = new THREE.Group();
-    const arcRadius = w*0.42;
-    const segments = Math.max(18, Math.round(w*7));
-    for(let i=0;i<=segments;i++){
-      const t = i/segments;
-      const angle = Math.PI - t*Math.PI;
-      const bx = Math.cos(angle)*arcRadius;
-      const by = Math.sin(angle)*arcRadius + 0.15;
-      const r = 0.13 + Math.random()*0.05;
-      const sphere = new THREE.Mesh(
-        new THREE.SphereGeometry(r, 14, 14),
-        new THREE.MeshStandardMaterial({color:new THREE.Color(colors[i%colors.length]), roughness:0.25, metalness:0.05})
-      );
-      sphere.position.set(bx, by, -0.05 + (Math.random()-0.5)*0.15);
-      sphere.castShadow = true;
-      archGroup.add(sphere);
-    }
-    archGroup.position.y = 0.0;
-    group.add(archGroup);
-  }
-
-  // mesa
-  if(cfg.showTable){
-    const clothMat = new THREE.MeshStandardMaterial({color:new THREE.Color(theme.accent), roughness:0.6});
-    const top = new THREE.Mesh(new THREE.CylinderGeometry(0.55,0.6,0.75,24), clothMat);
-    top.position.set(0, 0.375, 0.9);
-    top.castShadow = true;
-    group.add(top);
-    const rim = new THREE.Mesh(new THREE.TorusGeometry(0.55,0.02,8,32), new THREE.MeshStandardMaterial({color:new THREE.Color(theme.totem), metalness:0.7, roughness:0.3}));
-    rim.rotation.x = Math.PI/2;
-    rim.position.set(0, 0.75, 0.9);
-    group.add(rim);
-    const topper = new THREE.Mesh(new THREE.SphereGeometry(0.12,16,16), new THREE.MeshStandardMaterial({color:new THREE.Color(theme.balloons[0])}));
-    topper.position.set(0, 0.95, 0.9);
-    group.add(topper);
-  }
-
-  if(opts.includeShadowBlob){
-    const tex = new THREE.CanvasTexture(createShadowBlobTexture());
-    const blob = new THREE.Mesh(
-      new THREE.PlaneGeometry(w*1.4, 1.2),
-      new THREE.MeshBasicMaterial({map:tex, transparent:true, depthWrite:false})
-    );
-    blob.rotation.x = -Math.PI/2;
-    blob.position.set(0, 0.005, -0.3);
-    group.add(blob);
-  }
-
-  return group;
-}
-
-function computeAreaText(w){
-  const area = (w * 2.4).toFixed(1).replace('.', ',');
-  return area + ' m²';
-}
-
-/* ============================================================
-   BUILDER SCENE
-   ============================================================ */
-let builderScene, builderCamera, builderRenderer, builderGroup;
-let builderTarget = new THREE.Vector3(0,1.1,0);
-let sph = { radius: 6.5, theta: Math.PI/2, phi: 1.05 };
-let dragState = null;
-
-function initBuilder(){
-  const canvas = document.getElementById('builder-canvas');
-  builderScene = new THREE.Scene();
-  builderScene.background = null;
-
-  builderCamera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
-
-  builderRenderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:true});
-  builderRenderer.shadowMap.enabled = true;
-  builderRenderer.shadowMap.type = THREE.PCFSoftShadowMap;
-
-  const hemi = new THREE.HemisphereLight(0xfff2e0, 0x0a0810, 0.55);
-  builderScene.add(hemi);
-  const spot = new THREE.SpotLight(0xfff2df, 1.6, 20, Math.PI/5, 0.5, 1.2);
-  spot.position.set(2.5, 5.5, 3);
-  spot.castShadow = true;
-  spot.shadow.mapSize.set(1024,1024);
-  builderScene.add(spot);
-  const fill = new THREE.DirectionalLight(0x6a5cff, 0.25);
-  fill.position.set(-3, 2, -2);
-  builderScene.add(fill);
-
-  const floorTex = new THREE.CanvasTexture(createFloorTexture());
-  const floor = new THREE.Mesh(
-    new THREE.CircleGeometry(9, 48),
-    new THREE.MeshStandardMaterial({map:floorTex, roughness:0.9})
-  );
-  floor.rotation.x = -Math.PI/2;
-  floor.receiveShadow = true;
-  builderScene.add(floor);
-
-  rebuildBuilderGroup();
-  bindBuilderPointerEvents(canvas);
-  resizeBuilder();
-  animateBuilder();
-}
-
-function rebuildBuilderGroup(){
-  if(builderGroup) builderScene.remove(builderGroup);
-  builderGroup = buildAssemblyGroup(config, {includeShadowBlob:false});
-  builderScene.add(builderGroup);
-}
-
-function bindBuilderPointerEvents(canvas){
-  canvas.addEventListener('pointerdown', e=>{
-    dragState = {x:e.clientX, y:e.clientY, theta:sph.theta, phi:sph.phi};
-    canvas.setPointerCapture(e.pointerId);
-  });
-  canvas.addEventListener('pointermove', e=>{
-    if(!dragState) return;
-    const dx = e.clientX - dragState.x, dy = e.clientY - dragState.y;
-    sph.theta = dragState.theta - dx*0.007;
-    sph.phi = Math.min(Math.PI-0.15, Math.max(0.25, dragState.phi - dy*0.007));
-  });
-  canvas.addEventListener('pointerup', ()=> dragState=null);
-  canvas.addEventListener('pointerleave', ()=> dragState=null);
-  canvas.addEventListener('wheel', e=>{
-    e.preventDefault();
-    sph.radius = Math.min(11, Math.max(3.5, sph.radius + e.deltaY*0.003));
-  }, {passive:false});
-}
-
-function updateBuilderCamera(){
-  const {radius, theta, phi} = sph;
-  builderCamera.position.set(
-    builderTarget.x + radius*Math.sin(phi)*Math.cos(theta),
-    builderTarget.y + radius*Math.cos(phi),
-    builderTarget.z + radius*Math.sin(phi)*Math.sin(theta)
-  );
-  builderCamera.lookAt(builderTarget);
-}
-
-function resizeBuilder(){
-  const stage = document.querySelector('#builder-view .stage');
-  const w = stage.clientWidth, h = stage.clientHeight;
-  builderRenderer.setSize(w,h);
-  builderRenderer.setPixelRatio(Math.min(2, window.devicePixelRatio));
-  builderCamera.aspect = w/h;
-  builderCamera.updateProjectionMatrix();
-}
-
-function animateBuilder(){
-  requestAnimationFrame(animateBuilder);
-  if(!document.getElementById('builder-view').classList.contains('active')) return;
-  updateBuilderCamera();
-  builderRenderer.render(builderScene, builderCamera);
-}
-
-/* ============================================================
-   UI — BUILDER CONTROLS
-   ============================================================ */
-function renderThemeGrid(){
-  const grid = document.getElementById('theme-grid');
-  grid.innerHTML = '';
-  THEMES.forEach(theme=>{
-    const card = document.createElement('div');
-    card.className = 'theme-card' + (theme.id===config.theme.id ? ' active' : '');
-    card.innerHTML = `<div class="theme-swatch" style="background:linear-gradient(135deg, ${theme.panelBase}, ${theme.accent})"></div><span>${theme.label}</span>`;
-    card.addEventListener('click', ()=>{
-      config.theme = theme;
-      config.balloonColor1 = theme.balloons[0];
-      config.balloonColor2 = theme.balloons[1];
-      document.getElementById('balloon-color-1').value = theme.balloons[0];
-      document.getElementById('balloon-color-2').value = theme.balloons[1];
-      renderThemeGrid();
-      rebuildBuilderGroup();
-      updateDrawerSummary();
-      rebuildARGroup();
-    });
-    grid.appendChild(card);
-  });
-}
-
-function updateDrawerSummary(){
-  const el = document.getElementById('drawer-summary');
-  if(el) el.textContent = config.theme.label + ' · ' + config.panelWidthM.toFixed(1).replace('.',',') + ' m';
-}
-
-function initDrawer(){
-  const drawer = document.getElementById('controls-drawer');
-  const handle = document.getElementById('drawer-handle');
-  handle.addEventListener('click', ()=> drawer.classList.toggle('open'));
-}
-
-function initControls(){
-  renderThemeGrid();
-  initDrawer();
-  document.getElementById('balloon-color-1').value = config.balloonColor1;
-  document.getElementById('balloon-color-2').value = config.balloonColor2;
-
-  document.getElementById('width-slider').addEventListener('input', e=>{
-    config.panelWidthM = parseFloat(e.target.value);
-    document.getElementById('width-val').textContent = config.panelWidthM.toFixed(1) + ' m';
-    document.getElementById('area-val').textContent = computeAreaText(config.panelWidthM);
-    rebuildBuilderGroup(); rebuildARGroup(); updateDrawerSummary();
-  });
-  document.getElementById('area-val').textContent = computeAreaText(config.panelWidthM);
-
-  document.getElementById('balloon-color-1').addEventListener('input', e=>{
-    config.balloonColor1 = e.target.value; rebuildBuilderGroup(); rebuildARGroup();
-  });
-  document.getElementById('balloon-color-2').addEventListener('input', e=>{
-    config.balloonColor2 = e.target.value; rebuildBuilderGroup(); rebuildARGroup();
-  });
-
-  document.getElementById('toggle-totems').addEventListener('change', e=>{ config.showTotems=e.target.checked; rebuildBuilderGroup(); rebuildARGroup(); });
-  document.getElementById('toggle-arch').addEventListener('change', e=>{ config.showArch=e.target.checked; rebuildBuilderGroup(); rebuildARGroup(); });
-  document.getElementById('toggle-table').addEventListener('change', e=>{ config.showTable=e.target.checked; rebuildBuilderGroup(); rebuildARGroup(); });
-
-  document.getElementById('go-to-ar').addEventListener('click', ()=> switchTab('ar'));
-
-  document.getElementById('send-quote').addEventListener('click', ()=>{
-    const itens = [];
-    if(config.showTotems) itens.push('totens');
-    if(config.showArch) itens.push('arco de balões');
-    if(config.showTable) itens.push('mesa de apoio');
-    const msg = `Quero orçamento dessa montagem: painel ${config.theme.label} de ${config.panelWidthM.toFixed(1)}m de largura` +
-      (itens.length ? `, com ${itens.join(', ')}` : '') +
-      `, balões nas cores ${config.balloonColor1} e ${config.balloonColor2}.`;
-    if(window.sendPrompt) window.sendPrompt(msg);
-  });
-}
-
-/* ============================================================
-   TABS
-   ============================================================ */
-function switchTab(name){
-  document.getElementById('tab-builder').classList.toggle('active', name==='builder');
-  document.getElementById('tab-ar').classList.toggle('active', name==='ar');
-  document.getElementById('builder-view').classList.toggle('active', name==='builder');
-  document.getElementById('ar-view').classList.toggle('active', name==='ar');
-  if(name==='ar') onEnterAR(); else onLeaveAR();
-  if(name==='builder') requestAnimationFrame(resizeBuilder);
-}
-document.getElementById('tab-builder').addEventListener('click', ()=>switchTab('builder'));
-document.getElementById('tab-ar').addEventListener('click', ()=>switchTab('ar'));
-
-/* ============================================================
-   AR NATIVO (WEBXR + QUICK LOOK)
-   ============================================================ */
-let arScene, arCamera, arRenderer, arGroup, arReticle, arController;
-let arHitTestSource = null;
-let arHitTestSourceRequested = false;
-let nativeARButton = null;
-let iosObjectUrl = null;
-
-function initARThree(){
-  const canvas = document.getElementById('ar-canvas');
-  arScene = new THREE.Scene();
-  arCamera = new THREE.PerspectiveCamera(70, 1, 0.01, 40);
-
-  arRenderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:true});
-  arRenderer.setClearColor(0x000000, 0);
-  arRenderer.xr.enabled = true;
-  arRenderer.setAnimationLoop(renderARFrame);
-
-  const hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 1.05);
-  arScene.add(hemi);
-  const dir = new THREE.DirectionalLight(0xffffff, 0.65);
-  dir.position.set(2,4,2);
-  arScene.add(dir);
-
-  arReticle = new THREE.Mesh(
-    new THREE.RingGeometry(0.18, 0.24, 32).rotateX(-Math.PI / 2),
-    new THREE.MeshBasicMaterial({color:0xFF5A36})
-  );
-  arReticle.matrixAutoUpdate = false;
-  arReticle.visible = false;
-  arScene.add(arReticle);
-
-  rebuildARGroup();
-  arGroup.visible = false;
-
-  arController = arRenderer.xr.getController(0);
-  arController.addEventListener('select', placeARGroupAtReticle);
-  arScene.add(arController);
-
-  createNativeARButton();
-  resizeAR();
-}
-
-function rebuildARGroup(){
-  if(!arScene) return;
-  const wasPlaced = arGroup ? arGroup.visible : false;
-  const oldPosition = arGroup ? arGroup.position.clone() : null;
-  const oldQuaternion = arGroup ? arGroup.quaternion.clone() : null;
-  if(arGroup) arScene.remove(arGroup);
-  arGroup = buildAssemblyGroup(config, {includeShadowBlob:true});
-  arGroup.scale.setScalar(1);
-  arGroup.visible = wasPlaced;
-  if(oldPosition && oldQuaternion){
-    arGroup.position.copy(oldPosition);
-    arGroup.quaternion.copy(oldQuaternion);
-  }
-  arScene.add(arGroup);
-}
-
-function placeARGroupAtReticle(){
-  if(!arReticle || !arReticle.visible || !arGroup) return;
-  arReticle.matrix.decompose(arGroup.position, arGroup.quaternion, arGroup.scale);
-  arGroup.scale.setScalar(1);
-  arGroup.visible = true;
-  document.getElementById('ar-empty').style.display = 'none';
-  document.getElementById('ar-placement-hint').classList.add('hidden');
-}
-
-function createNativeARButton(){
-  if(nativeARButton || !THREE.ARButton) return;
-  nativeARButton = THREE.ARButton.createButton(arRenderer, {
-    requiredFeatures:['hit-test'],
-    optionalFeatures:['local-floor', 'dom-overlay'],
-    domOverlay:{root:document.body}
-  });
-  nativeARButton.className = 'webxr-native-button';
-  nativeARButton.setAttribute('aria-hidden', 'true');
-  document.body.appendChild(nativeARButton);
-
-  arRenderer.xr.addEventListener('sessionstart', ()=>{
-    arHitTestSource = null;
-    arHitTestSourceRequested = false;
-    arReticle.visible = false;
-    if(arGroup) arGroup.visible = false;
-    document.getElementById('ar-empty').style.display = 'none';
-    document.getElementById('ar-placement-hint').classList.remove('hidden');
-  });
-  arRenderer.xr.addEventListener('sessionend', ()=>{
-    arHitTestSource = null;
-    arHitTestSourceRequested = false;
-    arReticle.visible = false;
-    document.getElementById('ar-empty').style.display = 'flex';
-    document.getElementById('ar-placement-hint').classList.add('hidden');
-  });
-}
-
-function renderARFrame(timestamp, frame){
-  if(frame){
-    const referenceSpace = arRenderer.xr.getReferenceSpace();
-    const session = arRenderer.xr.getSession();
-
-    if(!arHitTestSourceRequested){
-      session.requestReferenceSpace('viewer').then(referenceSpaceViewer=>{
-        return session.requestHitTestSource({space:referenceSpaceViewer});
-      }).then(source=>{
-        arHitTestSource = source;
-      }).catch(()=>{
-        arHitTestSourceRequested = false;
-        arHitTestSource = null;
-      });
-
-      session.addEventListener('end', ()=>{
-        arHitTestSourceRequested = false;
-        arHitTestSource = null;
-      });
-
-      arHitTestSourceRequested = true;
-    }
-
-    if(arHitTestSource){
-      const hitTestResults = frame.getHitTestResults(arHitTestSource);
-      if(hitTestResults.length){
-        const hit = hitTestResults[0];
-        const pose = hit.getPose(referenceSpace);
-        arReticle.visible = true;
-        arReticle.matrix.fromArray(pose.transform.matrix);
-      } else {
-        arReticle.visible = false;
-      }
-    }
-  }
-
-  arRenderer.render(arScene, arCamera);
-}
-
-function resizeAR(){
-  const stage = document.getElementById('ar-stage');
-  const w = stage.clientWidth, h = stage.clientHeight;
-  if(!arRenderer || !w || !h) return;
-  arRenderer.setSize(w,h);
-  arRenderer.setPixelRatio(Math.min(2, window.devicePixelRatio));
-  arCamera.aspect = w/h;
-  arCamera.updateProjectionMatrix();
-}
-
-function onEnterAR(){
-  if(!arScene) initARThree();
-  rebuildARGroup();
-  resizeAR();
-  updateARDeviceUI();
-}
-
-function onLeaveAR(){
-  if(arRenderer && arRenderer.xr && arRenderer.xr.getSession()){
-    arRenderer.xr.getSession().end();
-  }
-  document.getElementById('ar-placement-hint').classList.add('hidden');
-}
-
-function updateARDeviceUI(){
-  const ua = navigator.userAgent || '';
-  const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-  const isAndroid = /Android/.test(ua);
-  const androidBtn = document.getElementById('ar-open-android');
-  const iosBtn = document.getElementById('ar-open-ios');
-  const note = document.getElementById('ar-device-note');
-
-  androidBtn.style.display = isIOS ? 'none' : 'block';
-  iosBtn.style.display = isAndroid ? 'none' : 'block';
-  note.textContent = isIOS
-    ? 'No iPhone, o arquivo GLB é gerado com as texturas atuais e aberto via Quick Look.'
-    : 'No Android, o Chrome usa WebXR com hit-test para detectar o chão real.';
-}
-
-function openAndroidAR(){
-  if(!arScene) initARThree();
-  resizeAR();
-  if(nativeARButton && typeof nativeARButton.click === 'function'){
-    nativeARButton.click();
-  } else {
-    alert('WebXR AR não está disponível neste navegador. Use Chrome em um Android compatível.');
-  }
-}
-
-function exportCurrentAssemblyGLB(){
-  return new Promise((resolve, reject)=>{
-    if(!THREE.GLTFExporter){
-      reject(new Error('GLTFExporter não carregou.'));
-      return;
-    }
-    const exportScene = new THREE.Scene();
-    const exportGroup = buildAssemblyGroup(config, {includeShadowBlob:false});
-    exportGroup.name = 'Vitrine 3D - escala real';
-    exportScene.add(exportGroup);
-
-    const exporter = new THREE.GLTFExporter();
-    exporter.parse(
-      exportScene,
-      result=>{
-        const blob = result instanceof ArrayBuffer
-          ? new Blob([result], {type:'model/gltf-binary'})
-          : new Blob([JSON.stringify(result)], {type:'model/gltf+json'});
-        resolve(blob);
-      },
-      {binary:true}
-    );
-  });
-}
-
-async function openIOSQuickLook(){
-  const iosBtn = document.getElementById('ar-open-ios');
-  iosBtn.disabled = true;
-  iosBtn.textContent = 'Gerando GLB...';
-  try{
-    const blob = await exportCurrentAssemblyGLB();
-    if(iosObjectUrl) URL.revokeObjectURL(iosObjectUrl);
-    iosObjectUrl = URL.createObjectURL(blob);
-
-    const link = document.getElementById('ios-ar-link');
-    link.href = iosObjectUrl;
-    link.download = 'vitrine-3d.glb';
-    link.click();
-  }catch(err){
-    alert('Não consegui gerar o arquivo AR: ' + err.message);
-  }finally{
-    iosBtn.disabled = false;
-    iosBtn.textContent = 'Abrir AR (iPhone)';
-  }
-}
-
-document.getElementById('ar-open-android').addEventListener('click', openAndroidAR);
-document.getElementById('ar-open-ios').addEventListener('click', openIOSQuickLook);
-
-/* ============================================================
-   INIT
-   ============================================================ */
-window.addEventListener('resize', ()=>{ resizeBuilder(); resizeAR(); });
-initControls();
-initBuilder();
-</script>
-</body>
+    <script type="module" src="./main.js"></script>
+  </body>
 </html>
