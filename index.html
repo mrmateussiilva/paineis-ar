@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Vitrine 3D — Monte & Mostre</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <style>
@@ -10,28 +10,37 @@
     --bg:#0F0D12; --surface:#1A171E; --surface-2:#221E27;
     --accent:#FF5A36; --accent-2:#FFC145; --accent-3:#7C5CFC;
     --text:#F5F1EA; --muted:#8F8792; --line:#2C2732;
+    --sat:env(safe-area-inset-top,0px); --sab:env(safe-area-inset-bottom,0px);
+    --sal:env(safe-area-inset-left,0px); --sar:env(safe-area-inset-right,0px);
   }
-  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
-  html,body{margin:0; height:100%; background:var(--bg); color:var(--text);
-    font-family:'Manrope','Inter',system-ui,sans-serif; overflow:hidden;}
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent; touch-action:manipulation;}
+  html,body{margin:0; height:100vh; height:100dvh; background:var(--bg); color:var(--text);
+    font-family:'Manrope','Inter',system-ui,sans-serif; overflow:hidden; overscroll-behavior:none;}
   h1,h2,h3,.display{font-family:'Archivo Black','Arial Black',sans-serif; letter-spacing:-0.01em;}
-  #app{display:flex; flex-direction:column; height:100%;}
+  #app{display:flex; flex-direction:column; height:100vh; height:100dvh;}
 
   header{display:flex; align-items:center; justify-content:space-between;
-    padding:14px 20px; border-bottom:1px solid var(--line); flex-shrink:0; gap:12px;}
-  .brand{display:flex; align-items:baseline; gap:8px;}
-  .brand .display{font-size:18px;}
-  .brand .tag{font-size:11px; color:var(--muted); font-family:'JetBrains Mono',monospace;}
-  nav.tabs{display:flex; gap:6px; background:var(--surface); padding:4px; border-radius:10px;}
+    padding:calc(10px + var(--sat)) calc(14px + var(--sar)) 10px calc(14px + var(--sal));
+    border-bottom:1px solid var(--line); flex-shrink:0; gap:10px;}
+  .brand{display:flex; flex-direction:column; gap:1px; min-width:0;}
+  .brand .display{font-size:15px; white-space:nowrap;}
+  .brand .tag{font-size:10px; color:var(--muted); font-family:'JetBrains Mono',monospace; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  nav.tabs{display:flex; gap:4px; background:var(--surface); padding:4px; border-radius:10px; flex-shrink:0;}
   nav.tabs button{background:transparent; border:none; color:var(--muted); font-weight:700;
-    font-size:13px; padding:8px 14px; border-radius:7px; cursor:pointer; font-family:inherit;}
+    font-size:12px; padding:9px 12px; border-radius:7px; cursor:pointer; font-family:inherit; white-space:nowrap;}
   nav.tabs button.active{background:var(--accent); color:#160C08;}
 
   main{flex:1; display:flex; min-height:0;}
   .view{display:none; width:100%; height:100%;}
   .view.active{display:flex;}
 
+  @media (max-width:780px){
+    .brand .tag{display:none;}
+    nav.tabs button{padding:9px 10px; font-size:11px;}
+  }
+
   /* ---------- Builder ---------- */
+  #builder-view{position:relative; overflow:hidden;}
   #builder-view .stage{flex:1; position:relative; background:radial-gradient(ellipse at 50% 30%, #1c1822 0%, #0b0a0d 70%);}
   #builder-canvas{width:100%; height:100%; display:block; cursor:grab;}
   #builder-canvas:active{cursor:grabbing;}
@@ -40,6 +49,7 @@
 
   aside.controls{width:308px; flex-shrink:0; background:var(--surface); border-left:1px solid var(--line);
     overflow-y:auto; padding:18px; display:flex; flex-direction:column; gap:20px;}
+  .drawer-handle{display:none;}
   .ctl-block h3{font-size:11px; text-transform:uppercase; letter-spacing:0.08em; color:var(--muted);
     margin:0 0 10px 0; font-family:'JetBrains Mono',monospace; font-weight:500;}
   .theme-grid{display:grid; grid-template-columns:1fr 1fr; gap:8px;}
@@ -47,6 +57,28 @@
   .theme-card.active{border-color:var(--accent); box-shadow:0 0 0 1px var(--accent);}
   .theme-swatch{height:40px; border-radius:6px; margin-bottom:6px;}
   .theme-card span{font-size:11px; font-weight:700; display:block;}
+
+  /* ---- mobile: stage full-screen behind a draggable bottom sheet ---- */
+  @media (max-width:780px){
+    #builder-view{flex-direction:column;}
+    #builder-view .stage{position:absolute; inset:0; flex:none;}
+    aside.controls{
+      position:absolute; left:0; right:0; bottom:0; width:auto; max-height:78vh;
+      border-left:none; border-top:1px solid var(--line); border-radius:18px 18px 0 0;
+      box-shadow:0 -8px 30px rgba(0,0,0,0.45); padding:8px 16px calc(16px + var(--sab));
+      transform:translateY(calc(100% - 118px)); transition:transform .28s cubic-bezier(.2,.8,.3,1);
+      gap:16px; z-index:5;
+    }
+    aside.controls.open{transform:translateY(0);}
+    .drawer-handle{display:flex; align-items:center; justify-content:space-between; flex-shrink:0;
+      padding:10px 2px 6px; cursor:pointer;}
+    .drawer-handle .grip{width:36px; height:4px; background:var(--line); border-radius:4px; margin:0 auto;}
+    .drawer-handle-row{display:flex; align-items:center; justify-content:space-between;}
+    .drawer-handle-row span{font-size:12px; font-weight:800; color:var(--muted); font-family:'JetBrains Mono',monospace;}
+    .drawer-handle-row b{color:var(--text); font-size:13px;}
+    .theme-grid{grid-template-columns:none; grid-auto-flow:column; grid-auto-columns:104px; overflow-x:auto; padding-bottom:4px;}
+    .cta{margin-top:6px;}
+  }
 
   .row-label{display:flex; justify-content:space-between; font-size:12px; color:var(--muted); margin-bottom:6px;}
   .row-label b{color:var(--text); font-family:'JetBrains Mono',monospace; font-weight:500;}
@@ -83,17 +115,22 @@
     flex-direction:column; gap:14px; text-align:center; padding:30px;}
   .ar-empty p{color:var(--muted); font-size:13px; max-width:280px; line-height:1.5;}
   .ar-empty-icon{font-size:38px;}
-  .ar-panel-bottom{position:absolute; left:0; right:0; bottom:0; padding:14px 16px;
-    background:linear-gradient(0deg, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0) 100%); display:flex;
+  .ar-panel-bottom{position:absolute; left:0; right:0; bottom:0; padding:14px calc(16px + var(--sar)) calc(14px + var(--sab)) calc(16px + var(--sal));
+    background:linear-gradient(0deg, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 100%); display:flex;
     flex-direction:column; gap:10px;}
   .ar-sliders{display:flex; gap:14px;}
   .ar-slider{flex:1; background:rgba(20,17,24,0.7); backdrop-filter:blur(6px); padding:8px 12px; border-radius:10px;}
   .ar-slider .row-label{margin-bottom:2px; color:#c9c3ce;}
   .ar-buttons{display:flex; gap:8px;}
-  .ar-buttons .btn{flex:1; font-size:12px; padding:11px;}
+  .ar-buttons .btn{flex:1; font-size:12px; padding:12px;}
   input[type=file]{display:none;}
   #ar-canvas.dragging{cursor:grabbing;}
   #ar-canvas{cursor:grab;}
+  .ar-placement-hint{position:absolute; top:calc(14px + var(--sat)); left:50%; transform:translateX(-50%);
+    background:rgba(20,17,24,0.75); backdrop-filter:blur(6px); color:var(--text); font-size:12px;
+    padding:8px 14px; border-radius:20px; pointer-events:none; transition:opacity .3s; z-index:3;
+    display:flex; align-items:center; gap:6px;}
+  .ar-placement-hint.hidden{opacity:0;}
 </style>
 </head>
 <body>
@@ -116,7 +153,16 @@
         <canvas id="builder-canvas"></canvas>
         <div class="stage-hint">arraste para girar · scroll para zoom</div>
       </div>
-      <aside class="controls">
+      <aside class="controls" id="controls-drawer">
+        <div class="drawer-handle" id="drawer-handle">
+          <div style="flex:1;">
+            <div class="grip"></div>
+            <div class="drawer-handle-row" style="margin-top:8px;">
+              <span>PERSONALIZAR</span>
+              <b id="drawer-summary">Geométrico Dourado · 3,0 m</b>
+            </div>
+          </div>
+        </div>
         <div class="ctl-block">
           <h3>Temas prontos</h3>
           <div class="theme-grid" id="theme-grid"></div>
@@ -168,6 +214,9 @@
         <video id="ar-video" playsinline muted autoplay></video>
         <img id="ar-photo" alt="foto do local">
         <canvas id="ar-canvas"></canvas>
+        <div class="ar-placement-hint hidden" id="ar-placement-hint">
+          <span>👆</span><span>toque no chão pra posicionar · 2 dedos pra girar e ajustar tamanho</span>
+        </div>
         <div class="ar-empty" id="ar-empty">
           <div class="ar-empty-icon">📷</div>
           <h3 style="margin:0;">Mostrar no local</h3>
@@ -519,13 +568,27 @@ function renderThemeGrid(){
       document.getElementById('balloon-color-2').value = theme.balloons[1];
       renderThemeGrid();
       rebuildBuilderGroup();
+      updateDrawerSummary();
+      rebuildARGroup();
     });
     grid.appendChild(card);
   });
 }
 
+function updateDrawerSummary(){
+  const el = document.getElementById('drawer-summary');
+  if(el) el.textContent = config.theme.label + ' · ' + config.panelWidthM.toFixed(1).replace('.',',') + ' m';
+}
+
+function initDrawer(){
+  const drawer = document.getElementById('controls-drawer');
+  const handle = document.getElementById('drawer-handle');
+  handle.addEventListener('click', ()=> drawer.classList.toggle('open'));
+}
+
 function initControls(){
   renderThemeGrid();
+  initDrawer();
   document.getElementById('balloon-color-1').value = config.balloonColor1;
   document.getElementById('balloon-color-2').value = config.balloonColor2;
 
@@ -533,20 +596,20 @@ function initControls(){
     config.panelWidthM = parseFloat(e.target.value);
     document.getElementById('width-val').textContent = config.panelWidthM.toFixed(1) + ' m';
     document.getElementById('area-val').textContent = computeAreaText(config.panelWidthM);
-    rebuildBuilderGroup();
+    rebuildBuilderGroup(); rebuildARGroup(); updateDrawerSummary();
   });
   document.getElementById('area-val').textContent = computeAreaText(config.panelWidthM);
 
   document.getElementById('balloon-color-1').addEventListener('input', e=>{
-    config.balloonColor1 = e.target.value; rebuildBuilderGroup();
+    config.balloonColor1 = e.target.value; rebuildBuilderGroup(); rebuildARGroup();
   });
   document.getElementById('balloon-color-2').addEventListener('input', e=>{
-    config.balloonColor2 = e.target.value; rebuildBuilderGroup();
+    config.balloonColor2 = e.target.value; rebuildBuilderGroup(); rebuildARGroup();
   });
 
-  document.getElementById('toggle-totems').addEventListener('change', e=>{ config.showTotems=e.target.checked; rebuildBuilderGroup(); });
-  document.getElementById('toggle-arch').addEventListener('change', e=>{ config.showArch=e.target.checked; rebuildBuilderGroup(); });
-  document.getElementById('toggle-table').addEventListener('change', e=>{ config.showTable=e.target.checked; rebuildBuilderGroup(); });
+  document.getElementById('toggle-totems').addEventListener('change', e=>{ config.showTotems=e.target.checked; rebuildBuilderGroup(); rebuildARGroup(); });
+  document.getElementById('toggle-arch').addEventListener('change', e=>{ config.showArch=e.target.checked; rebuildBuilderGroup(); rebuildARGroup(); });
+  document.getElementById('toggle-table').addEventListener('change', e=>{ config.showTable=e.target.checked; rebuildBuilderGroup(); rebuildARGroup(); });
 
   document.getElementById('go-to-ar').addEventListener('click', ()=> switchTab('ar'));
 
@@ -580,22 +643,28 @@ document.getElementById('tab-ar').addEventListener('click', ()=>switchTab('ar'))
    AR (OVERLAY) SCENE
    ============================================================ */
 let arScene, arCamera, arRenderer, arGroup, arReady=false, arStream=null;
-let arTransform = { scale:1.0, rot:0, offX:0, offY:0 };
-let arDrag = null;
+let arTransform = { scale:1.0, rot:0, offX:0, offZ:-2.2 };
+let arPointers = new Map();
+let pinchState = null;
+const arRaycaster = new THREE.Raycaster();
+const arGroundPlane = new THREE.Plane(new THREE.Vector3(0,1,0), 0);
+const clamp = (v,min,max)=> Math.min(max, Math.max(min, v));
 
 function initARThree(){
   const canvas = document.getElementById('ar-canvas');
   arScene = new THREE.Scene();
-  arCamera = new THREE.PerspectiveCamera(35, 1, 0.1, 100);
-  arCamera.position.set(0, 1.3, 6.2);
-  arCamera.lookAt(0,1.1,0);
+  // Câmera na altura aproximada de quem segura o celular, olhando levemente pra baixo —
+  // isso é o que faz o objeto "encolher" de forma realista ao arrastar pra longe.
+  arCamera = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
+  arCamera.position.set(0, 1.45, 3.4);
+  arCamera.lookAt(0, 0.75, -2.5);
 
   arRenderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:true});
   arRenderer.setClearColor(0x000000, 0);
 
-  const hemi = new THREE.HemisphereLight(0xffffff, 0x222222, 0.9);
+  const hemi = new THREE.HemisphereLight(0xffffff, 0x333333, 0.95);
   arScene.add(hemi);
-  const dir = new THREE.DirectionalLight(0xffffff, 0.7);
+  const dir = new THREE.DirectionalLight(0xffffff, 0.75);
   dir.position.set(2,4,3);
   arScene.add(dir);
 
@@ -615,25 +684,89 @@ function applyARTransform(){
   if(!arGroup) return;
   arGroup.scale.setScalar(arTransform.scale);
   arGroup.rotation.y = arTransform.rot * Math.PI/180;
-  arGroup.position.set(arTransform.offX, 0, arTransform.offY);
+  arGroup.position.set(arTransform.offX, 0, arTransform.offZ);
+}
+
+// Converte um ponto de toque na tela numa posição real no "chão" da cena,
+// via raycast — é isso que dá a sensação de profundidade/perspectiva real
+// (quanto mais longe a pessoa arrasta, menor o objeto fica, automaticamente).
+function screenToGround(clientX, clientY, canvas){
+  const rect = canvas.getBoundingClientRect();
+  const ndc = new THREE.Vector2(
+    ((clientX-rect.left)/rect.width)*2-1,
+    -((clientY-rect.top)/rect.height)*2+1
+  );
+  arRaycaster.setFromCamera(ndc, arCamera);
+  const pt = new THREE.Vector3();
+  const hit = arRaycaster.ray.intersectPlane(arGroundPlane, pt);
+  return hit ? pt : null;
+}
+
+function placeAtScreenPoint(clientX, clientY, canvas){
+  const p = screenToGround(clientX, clientY, canvas);
+  if(!p) return;
+  arTransform.offX = clamp(p.x, -4.5, 4.5);
+  arTransform.offZ = clamp(p.z, -8, -0.6);
+  applyARTransform();
+}
+
+function hidePlacementHint(){
+  const hint = document.getElementById('ar-placement-hint');
+  if(hint) hint.classList.add('hidden');
 }
 
 function bindARPointerEvents(canvas){
   canvas.addEventListener('pointerdown', e=>{
-    arDrag = {x:e.clientX, y:e.clientY, ox:arTransform.offX, oy:arTransform.offY};
-    canvas.classList.add('dragging');
     canvas.setPointerCapture(e.pointerId);
+    arPointers.set(e.pointerId, {x:e.clientX, y:e.clientY});
+    hidePlacementHint();
+    if(arPointers.size >= 2){
+      const pts = [...arPointers.values()].slice(0,2);
+      const dist0 = Math.hypot(pts[0].x-pts[1].x, pts[0].y-pts[1].y);
+      const angle0 = Math.atan2(pts[1].y-pts[0].y, pts[1].x-pts[0].x);
+      pinchState = {dist0, angle0, scale0:arTransform.scale, rot0:arTransform.rot};
+      canvas.classList.remove('dragging');
+    } else {
+      canvas.classList.add('dragging');
+      placeAtScreenPoint(e.clientX, e.clientY, canvas);
+    }
   });
+
   canvas.addEventListener('pointermove', e=>{
-    if(!arDrag) return;
-    const dx = (e.clientX - arDrag.x) * 0.006;
-    const dy = (e.clientY - arDrag.y) * 0.006;
-    arTransform.offX = arDrag.ox + dx;
-    arTransform.offY = arDrag.oy + dy;
-    applyARTransform();
+    if(!arPointers.has(e.pointerId)) return;
+    arPointers.set(e.pointerId, {x:e.clientX, y:e.clientY});
+
+    if(arPointers.size >= 2 && pinchState){
+      const pts = [...arPointers.values()].slice(0,2);
+      const dist = Math.hypot(pts[0].x-pts[1].x, pts[0].y-pts[1].y);
+      const angle = Math.atan2(pts[1].y-pts[0].y, pts[1].x-pts[0].x);
+      arTransform.scale = clamp(pinchState.scale0 * (dist/pinchState.dist0), 0.4, 2.4);
+      arTransform.rot = pinchState.rot0 + (angle-pinchState.angle0)*180/Math.PI;
+      syncARSliders();
+      applyARTransform();
+    } else if(arPointers.size===1){
+      placeAtScreenPoint(e.clientX, e.clientY, canvas);
+    }
   });
-  canvas.addEventListener('pointerup', ()=>{ arDrag=null; canvas.classList.remove('dragging'); });
-  canvas.addEventListener('pointerleave', ()=>{ arDrag=null; canvas.classList.remove('dragging'); });
+
+  function endPointer(e){
+    arPointers.delete(e.pointerId);
+    pinchState = null;
+    if(arPointers.size===0) canvas.classList.remove('dragging');
+  }
+  canvas.addEventListener('pointerup', endPointer);
+  canvas.addEventListener('pointercancel', endPointer);
+}
+
+function syncARSliders(){
+  const scaleEl = document.getElementById('ar-scale');
+  const rotEl = document.getElementById('ar-rot');
+  const scalePct = Math.round(arTransform.scale*100);
+  const rotDeg = Math.round(((arTransform.rot+180)%360+360)%360 - 180);
+  scaleEl.value = clamp(scalePct, 40, 220);
+  rotEl.value = clamp(rotDeg, -180, 180);
+  document.getElementById('ar-scale-val').textContent = scaleEl.value + '%';
+  document.getElementById('ar-rot-val').textContent = rotEl.value + '°';
 }
 
 function resizeAR(){
@@ -689,6 +822,7 @@ function useUploadedPhoto(file){
 function onARBackgroundReady(){
   document.getElementById('ar-empty').style.display = 'none';
   document.getElementById('ar-controls').style.display = 'flex';
+  document.getElementById('ar-placement-hint').classList.remove('hidden');
   resizeAR();
 }
 
@@ -715,12 +849,13 @@ document.getElementById('ar-rot').addEventListener('input', e=>{
   applyARTransform();
 });
 document.getElementById('ar-reset').addEventListener('click', ()=>{
-  arTransform = {scale:1, rot:0, offX:0, offY:0};
+  arTransform = {scale:1, rot:0, offX:0, offZ:-2.2};
   document.getElementById('ar-scale').value = 100;
   document.getElementById('ar-rot').value = 0;
   document.getElementById('ar-scale-val').textContent = '100%';
   document.getElementById('ar-rot-val').textContent = '0°';
   applyARTransform();
+  document.getElementById('ar-placement-hint').classList.remove('hidden');
 });
 document.getElementById('ar-capture').addEventListener('click', ()=>{
   const stage = document.getElementById('ar-stage');
